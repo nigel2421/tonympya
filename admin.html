@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Manage Products</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+
+    <div class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Manage Products</h1>
+            <button id="addProductBtn" class="btn btn-primary">Add New Product</button>
+        </div>
+
+        <!-- Products Table -->
+        <table class="table table-striped">
+            <thead class="thead-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Price</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="productsTableBody">
+                <!-- Product rows will be inserted here by jQuery -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Add/Edit Product Modal -->
+    <div class="modal fade" id="productModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Add Product</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="productForm" novalidate>
+                        <input type="hidden" id="productId">
+                        <div class="control-group">
+                            <div class="form-group">
+                                <label for="productName">Product Name</label>
+                                <input type="text" class="form-control" id="productName" placeholder="Enter product name" required data-validation-required-message="Please enter the product name.">
+                                <p class="help-block text-danger"></p>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <div class="form-group">
+                                <label for="productDescription">Description</label>
+                                <textarea class="form-control" id="productDescription" rows="3" placeholder="Enter description" required data-validation-required-message="Please enter a description."></textarea>
+                                <p class="help-block text-danger"></p>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <div class="form-group">
+                                <label for="productPrice">Price</label>
+                                <input type="number" class="form-control" id="productPrice" placeholder="Enter price" required data-validation-required-message="Please enter a price." step="0.01" min="0">
+                                <p class="help-block text-danger"></p>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="button" id="saveProductBtn" class="btn btn-primary">Save changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- jQuery and Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    
+    <!-- IMPORTANT: Path to your validation script -->
+    <script src="c:/Users/USER/Documents/tonympya/mail/jqBootstrapValidation.min.js"></script>
+
+    <script>
+        $(function() {
+            const apiUrl = 'http://localhost:3000/api/products';
+
+            // Apply validation to the form
+            $("#productForm input, #productForm textarea").jqBootstrapValidation();
+
+            // --- Function to fetch and display products ---
+            function loadProducts() {
+                $.ajax({
+                    url: apiUrl,
+                    method: 'GET',
+                    success: function(products) {
+                        const tableBody = $('#productsTableBody');
+                        tableBody.empty(); // Clear existing rows
+                        products.forEach(product => {
+                            tableBody.append(`
+                                <tr data-id="${product.id}">
+                                    <td>${product.id}</td>
+                                    <td>${product.name}</td>
+                                    <td>${product.description}</td>
+                                    <td>$${product.price.toFixed(2)}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-info edit-btn">Edit</button>
+                                        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+                                    </td>
+                                </tr>
+                            `);
+                        });
+                    },
+                    error: function(err) {
+                        console.error('Error loading products:', err);
+                        alert('Could not load products. Make sure the API server is running.');
+                    }
+                });
+            }
+
+            // --- Event Handlers ---
+
+            // Show modal for adding a new product
+            $('#addProductBtn').on('click', function() {
+                $('#productForm').trigger('reset');
+                $('#productId').val('');
+                $('#modalTitle').text('Add Product');
+                $('#productModal').modal('show');
+            });
+
+            // Show modal for editing an existing product
+            $('#productsTableBody').on('click', '.edit-btn', function() {
+                const row = $(this).closest('tr');
+                const productId = row.data('id');
+                const name = row.find('td:eq(1)').text();
+                const description = row.find('td:eq(2)').text();
+                const price = parseFloat(row.find('td:eq(3)').text().replace('$', ''));
+
+                $('#modalTitle').text('Edit Product');
+                $('#productId').val(productId);
+                $('#productName').val(name);
+                $('#productDescription').val(description);
+                $('#productPrice').val(price.toFixed(2));
+                
+                $('#productModal').modal('show');
+            });
+
+            // Handle Save button click (for both Add and Edit)
+            $('#saveProductBtn').on('click', function() {
+                // Trigger validation
+                $("#productForm input, #productForm textarea").trigger("submit.validation");
+                if ($("#productForm .help-block:not(:empty)").length > 0) {
+                    console.log("Validation failed.");
+                    return; // Stop if validation fails
+                }
+
+                const productId = $('#productId').val();
+                const productData = {
+                    name: $('#productName').val(),
+                    description: $('#productDescription').val(),
+                    price: $('#productPrice').val()
+                };
+
+                const isEditing = !!productId;
+                const method = isEditing ? 'PUT' : 'POST';
+                const url = isEditing ? `${apiUrl}/${productId}` : apiUrl;
+
+                $.ajax({
+                    url: url,
+                    method: method,
+                    contentType: 'application/json',
+                    data: JSON.stringify(productData),
+                    success: function(response) {
+                        $('#productModal').modal('hide');
+                        loadProducts(); // Refresh the table
+                    },
+                    error: function(err) {
+                        console.error('Error saving product:', err);
+                        alert('Could not save product.');
+                    }
+                });
+            });
+
+            // Handle Delete button click
+            $('#productsTableBody').on('click', '.delete-btn', function() {
+                if (!confirm('Are you sure you want to delete this product?')) {
+                    return;
+                }
+
+                const productId = $(this).closest('tr').data('id');
+
+                $.ajax({
+                    url: `${apiUrl}/${productId}`,
+                    method: 'DELETE',
+                    success: function() {
+                        loadProducts(); // Refresh the table
+                    },
+                    error: function(err) {
+                        console.error('Error deleting product:', err);
+                        alert('Could not delete product.');
+                    }
+                });
+            });
+
+            // --- Initial Load ---
+            loadProducts();
+        });
+    </script>
+
+</body>
+</html>
